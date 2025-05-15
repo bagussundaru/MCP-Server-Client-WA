@@ -1,0 +1,59 @@
+{
+  "name": "MCP Server WhatsApp",
+  "nodes": [
+    {
+      "parameters": { "path": "mcp-server", "responseMode": "responseNode" },
+      "name": "MCP Server Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simple router\const text = $input.item.json.message || '';\nif (/kalkulator|hitung|calc|math/i.test(text)) return { tool: 'calculator', ...$input.item.json };\nreturn { tool: 'whatsapp', ...$input.item.json };"
+      },
+      "name": "Tools Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [400, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Kalkulator sederhana\const math = require('mathjs');\nlet result = '';\ntry { result = math.evaluate($input.item.json.message.replace(/kalkulator|hitung|calc|math/i,'')); }\ncatch(e) { result = 'Format salah.'; }\nreturn { result };"
+      },
+      "name": "Calculator",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [600, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simulasi kirim WA (ganti HTTP Request ke API WA sesungguhnya)\nreturn { status: 'sent', to: 'grup/nomor', body: $input.item.json.message };"
+      },
+      "name": "WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [600, 250]
+    },
+    {
+      "parameters": { "content": "={{ $json.result || $json.status }}" },
+      "name": "Respond to Client",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [800, 200]
+    }
+  ],
+  "connections": {
+    "MCP Server Trigger": {
+      "main": [[{ "node": "Tools Router", "type": "main", "index": 0 }]]
+    },
+    "Tools Router": {
+      "main": [
+        [{ "node": "Calculator", "type": "main", "index": 0 }],
+        [{ "node": "WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Calculator": { "main": [[{ "node": "Respond to Client", "type": "main", "index": 0 }]] },
+    "WhatsApp": { "main": [[{ "node": "Respond to Client", "type": "main", "index": 0 }]] }
+  }
+}

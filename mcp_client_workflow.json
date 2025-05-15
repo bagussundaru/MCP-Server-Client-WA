@@ -1,0 +1,44 @@
+{
+  "name": "MCP Client WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "message": "Kirim pesan ke grup keluarga: Selamat pagi!"
+      },
+      "name": "User Input (Mock)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [200, 200]
+    },
+    {
+      "parameters": {
+        "url": "http://<ALAMAT_N8N_SERVER>:5678/webhook/mcp-server",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={ \"message\": $json[\"message\"] }"
+      },
+      "name": "Send to MCP Server",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [400, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('Output:', $input.item.json); return $input.item.json;"
+      },
+      "name": "Show Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [600, 200]
+    }
+  ],
+  "connections": {
+    "User Input (Mock)": {
+      "main": [[{ "node": "Send to MCP Server", "type": "main", "index": 0 }]]
+    },
+    "Send to MCP Server": {
+      "main": [[{ "node": "Show Output", "type": "main", "index": 0 }]]
+    }
+  }
+}
