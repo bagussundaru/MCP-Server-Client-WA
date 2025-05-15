@@ -1,0 +1,158 @@
+{
+  "name": "Ultimate AI Agent WhatsApp Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "wa-server",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-wa",
+      "name": "WA Server Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Routing logic based on user input\nfunction findIntent(msg) {\n  const send = /(kirim|send|pesan|message)/i;\n  const reply = /(balas|reply|tanggapi)/i;\n  const list = /(daftar|list|lihat|show|history)/i;\n  const deleteM = /(hapus|delete|remove)/i;\n  const broadcast = /(broadcast|siarkan|umumkan)/i;\n  if (send.test(msg)) return 'wa_send';\n  if (reply.test(msg)) return 'wa_reply';\n  if (list.test(msg)) return 'wa_list';\n  if (deleteM.test(msg)) return 'wa_delete';\n  if (broadcast.test(msg)) return 'wa_broadcast';\n  return 'ai';\n}\n\nconst userMessage = $input.item.json.message || '';\nconst userId = $input.item.json.userId || 'anon';\nconst intent = findIntent(userMessage);\nreturn { userId, userMessage, intent, originalPayload: $input.item.json };"
+      },
+      "id": "router",
+      "name": "AI Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [400, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Placeholder for Redis chat memory (opsional)\nreturn { ...$input.item.json }"
+      },
+      "id": "redis-memory",
+      "name": "Redis Chat Memory",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [600, 200]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialName": "OpenRouter API",
+        "model": "openrouter/openrouter/claude-3-haiku-20240307",
+        "options": { "temperature": 0.7, "maxTokens": 2048 },
+        "prompt": "User intent: {{$json.intent}}\nUser message: {{$json.userMessage}}\n\nKontekstualisasikan perintah user. Jika intent WhatsApp, format function call JSON seperti:\n{\"tool\":\"wa\",\"action\":\"send\",\"parameters\":{\"to\":\"nomor_grup\",\"body\":\"...\"}}\natau untuk reply, delete, dsb.\nJika tidak perlu tools, balas langsung pesan user."
+      },
+      "id": "llm-agent",
+      "name": "OpenRouter Chat Model",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [800, 200],
+      "credentials": {
+        "openAiApi": { "id": "OpenRouter API", "name": "OpenRouter API" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract function call JSON (if any)\nlet resp = $input.item.json.response;\nlet fn = null;\ntry { fn = JSON.parse(resp.match(/\\{.*\\}/s)[0]); } catch(e){}\nreturn { functionCall: fn, originalResponse: resp, ...$input.item.json };"
+      },
+      "id": "extract-fn",
+      "name": "Extract Function Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{ $json.functionCall?.tool }}", "value2": "wa", "operation": "equal" }
+          ]
+        }
+      },
+      "id": "if-wa",
+      "name": "Is WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1200, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simulasi node WhatsApp Send (integrasi WhatsApp API, misal Waboxapp, Chat-API, Ultramsg, dll)\n// Ganti dengan node HTTP Request jika pakai API lain\nreturn {\n  status: 'sent',\n  to: $input.item.json.functionCall.parameters.to,\n  body: $input.item.json.functionCall.parameters.body\n};"
+      },
+      "id": "wa-send",
+      "name": "WA Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1400, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simulasi reply\nreturn {\n  status: 'replied',\n  to: $input.item.json.functionCall.parameters.to,\n  messageId: $input.item.json.functionCall.parameters.messageId,\n  body: $input.item.json.functionCall.parameters.body\n};"
+      },
+      "id": "wa-reply",
+      "name": "WA Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1400, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simulasi delete\nreturn {\n  status: 'deleted',\n  messageId: $input.item.json.functionCall.parameters.messageId\n};"
+      },
+      "id": "wa-delete",
+      "name": "WA Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1400, 250]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simulasi list\nreturn {\n  status: 'list',\n  messages: [\n    { id: 'msg1', body: 'Pesan 1' },\n    { id: 'msg2', body: 'Pesan 2' }\n  ]\n};"
+      },
+      "id": "wa-list",
+      "name": "WA List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simulasi broadcast\nreturn {\n  status: 'broadcasted',\n  to: $input.item.json.functionCall.parameters.to,\n  body: $input.item.json.functionCall.parameters.body\n};"
+      },
+      "id": "wa-broadcast",
+      "name": "WA Broadcast",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1400, 350]
+    },
+    {
+      "parameters": {
+        "content": "={{ $json.originalResponse }}"
+      },
+      "id": "resp-user",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1600, 200]
+    }
+  ],
+  "connections": {
+    "webhook-wa": { "main": [[{ "node": "router", "type": "main", "index": 0 }]] },
+    "router": { "main": [[{ "node": "redis-memory", "type": "main", "index": 0 }]] },
+    "redis-memory": { "main": [[{ "node": "llm-agent", "type": "main", "index": 0 }]] },
+    "llm-agent": { "main": [[{ "node": "extract-fn", "type": "main", "index": 0 }]] },
+    "extract-fn": { "main": [[{ "node": "if-wa", "type": "main", "index": 0 }]] },
+    "if-wa": {
+      "main": [
+        [{ "node": "wa-send", "type": "main", "index": 0 }],
+        [{ "node": "wa-reply", "type": "main", "index": 0 }],
+        [{ "node": "wa-delete", "type": "main", "index": 0 }],
+        [{ "node": "wa-list", "type": "main", "index": 0 }],
+        [{ "node": "wa-broadcast", "type": "main", "index": 0 }]
+      ]
+    },
+    "wa-send": { "main": [[{ "node": "resp-user", "type": "main", "index": 0 }]] },
+    "wa-reply": { "main": [[{ "node": "resp-user", "type": "main", "index": 0 }]] },
+    "wa-delete": { "main": [[{ "node": "resp-user", "type": "main", "index": 0 }]] },
+    "wa-list": { "main": [[{ "node": "resp-user", "type": "main", "index": 0 }]] },
+    "wa-broadcast": { "main": [[{ "node": "resp-user", "type": "main", "index": 0 }]] }
+  }
+}
